@@ -1,0 +1,25 @@
+[package]
+name = "claudectx"
+version = "0.1.0"
+authors = ["Francois-Guillaume RIBREAU <github@fgribreau.com>"]
+description = "Launch Claude Code with different profiles"
+repository = "https://github.com/FGRibreau/claudectx"
+homepage = "https://github.com/FGRibreau/claudectx"
+documentation = "https://docs.rs/claudectx"
+readme = "README.md"
+keywords = ["claude", "anthropic", "cli", "profiles", "launcher"]
+categories = ["command-line-utilities", "development-tools"]
+license = "MIT"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.4", features = ["derive"] }
+dialoguer = "0.11"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+dirs = "5.0"
+
+[dev-dependencies]
+assert_cmd = "2.0"
+predicates = "3.1"
+tempfile = "3.10"

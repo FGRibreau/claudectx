@@ -1,0 +1,355 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x86_64 (glibc)
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: claudectx
+            asset_name: claudectx_linux_x86_64
+
+          # Linux x86_64 (musl - static binary)
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            artifact_name: claudectx
+            asset_name: claudectx_linux_x86_64_musl
+            cross: true
+
+          # Linux ARM64
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            artifact_name: claudectx
+            asset_name: claudectx_linux_aarch64
+            cross: true
+
+          # Linux ARM64 (musl - static binary)
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            artifact_name: claudectx
+            asset_name: claudectx_linux_aarch64_musl
+            cross: true
+
+          # Linux ARMv7 (Raspberry Pi, etc.)
+          - os: ubuntu-latest
+            target: armv7-unknown-linux-gnueabihf
+            artifact_name: claudectx
+            asset_name: claudectx_linux_armv7
+            cross: true
+
+          # macOS x86_64 (Intel)
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: claudectx
+            asset_name: claudectx_darwin_x86_64
+
+          # macOS ARM64 (Apple Silicon)
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: claudectx
+            asset_name: claudectx_darwin_aarch64
+
+          # Windows x86_64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: claudectx.exe
+            asset_name: claudectx_windows_x86_64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross
+        if: matrix.cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build with cross
+        if: matrix.cross
+        run: cross build --release --target ${{ matrix.target }}
+
+      - name: Build with cargo
+        if: ${{ !matrix.cross }}
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Create tarball (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar -czvf ../../../${{ matrix.asset_name }}.tar.gz ${{ matrix.artifact_name }}
+          cd ../../..
+
+      - name: Create zip (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd target/${{ matrix.target }}/release
+          Compress-Archive -Path ${{ matrix.artifact_name }} -DestinationPath ../../../${{ matrix.asset_name }}.zip
+          cd ../../..
+
+      - name: Upload artifact (Unix)
+        if: runner.os != 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: ${{ matrix.asset_name }}.tar.gz
+
+      - name: Upload artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: ${{ matrix.asset_name }}.zip
+
+  build-deb:
+    name: Build .deb packages
+    runs-on: ubuntu-latest
+    needs: build
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            asset: claudectx_linux_x86_64
+          - arch: arm64
+            asset: claudectx_linux_aarch64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+
+      - name: Extract binary
+        run: |
+          tar -xzf ${{ matrix.asset }}.tar.gz
+
+      - name: Get version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Build .deb
+        run: |
+          mkdir -p pkg/DEBIAN pkg/usr/bin
+          cp claudectx pkg/usr/bin/
+          chmod 755 pkg/usr/bin/claudectx
+          cat > pkg/DEBIAN/control << EOF
+          Package: claudectx
+          Version: ${{ steps.version.outputs.version }}
+          Section: utils
+          Priority: optional
+          Architecture: ${{ matrix.arch }}
+          Maintainer: Francois-Guillaume Ribreau <github@fgribreau.com>
+          Description: Launch Claude Code with different profiles
+           claudectx manages multiple Claude Code profiles (Claude Max,
+           Claude Team, personal) by saving and launching with different
+           configurations. Each profile is a complete claude.json config.
+          Homepage: https://github.com/FGRibreau/claudectx
+          EOF
+          dpkg-deb --build pkg claudectx_${{ steps.version.outputs.version }}_${{ matrix.arch }}.deb
+
+      - name: Upload .deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: claudectx_${{ matrix.arch }}_deb
+          path: "*.deb"
+
+  release:
+    name: Create Release
+    needs: [build, build-deb]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      checksum_windows: ${{ steps.checksums.outputs.checksum_windows }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        id: checksums
+        run: |
+          cd artifacts
+          # Move all archives to current directory
+          find . -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.deb" \) -exec mv {} . \;
+          # Remove empty directories
+          find . -type d -empty -delete
+          # Create checksums
+          sha256sum *.tar.gz *.zip *.deb > checksums.txt
+          cat checksums.txt
+          # Extract Windows checksum for Chocolatey
+          echo "checksum_windows=$(grep 'claudectx_windows_x86_64.zip' checksums.txt | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/*.tar.gz
+            artifacts/*.zip
+            artifacts/*.deb
+            artifacts/checksums.txt
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-crates:
+    name: Publish to crates.io
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish to crates.io
+        run: cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        continue-on-error: true
+
+  update-homebrew:
+    name: Update Homebrew tap
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update Homebrew formula
+        uses: mislav/bump-homebrew-formula-action@v3
+        with:
+          formula-name: claudectx
+          formula-path: Formula/claudectx.rb
+          homebrew-tap: FGRibreau/homebrew-tap
+          download-url: https://github.com/FGRibreau/claudectx/releases/download/${{ github.ref_name }}/claudectx_darwin_aarch64.tar.gz
+        env:
+          COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        continue-on-error: true
+
+  publish-chocolatey:
+    name: Publish to Chocolatey
+    needs: release
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: claudectx_windows_x86_64
+          path: artifacts
+
+      - name: Get checksum
+        id: checksum
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash artifacts/claudectx_windows_x86_64.zip -Algorithm SHA256).Hash.ToLower()
+          echo "hash=$hash" >> $env:GITHUB_OUTPUT
+
+      - name: Prepare Chocolatey package
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+
+          # Update nuspec
+          $nuspec = Get-Content packaging/chocolatey/claudectx.nuspec -Raw
+          $nuspec = $nuspec -replace '\$version\$', $version
+          Set-Content packaging/chocolatey/claudectx.nuspec $nuspec
+
+          # Update install script with checksum
+          $install = Get-Content packaging/chocolatey/tools/chocolateyinstall.ps1 -Raw
+          $install = $install -replace '\$checksum64\$', '${{ steps.checksum.outputs.hash }}'
+          Set-Content packaging/chocolatey/tools/chocolateyinstall.ps1 $install
+
+      - name: Pack Chocolatey package
+        shell: pwsh
+        run: |
+          cd packaging/chocolatey
+          choco pack
+
+      - name: Push to Chocolatey
+        shell: pwsh
+        run: |
+          cd packaging/chocolatey
+          choco push *.nupkg --source https://push.chocolatey.org/ --api-key ${{ secrets.CHOCOLATEY_API_KEY }}
+        continue-on-error: true
+
+  update-scoop:
+    name: Update Scoop manifest
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download checksums
+        uses: actions/download-artifact@v4
+        with:
+          name: claudectx_windows_x86_64
+          path: artifacts
+
+      - name: Get checksum
+        id: checksum
+        run: |
+          hash=$(sha256sum artifacts/claudectx_windows_x86_64.zip | cut -d' ' -f1)
+          echo "hash=$hash" >> $GITHUB_OUTPUT
+
+      - name: Update Scoop manifest
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+
+          cat > scoop-claudectx.json << EOF
+          {
+              "version": "$version",
+              "description": "Launch Claude Code with different profiles",
+              "homepage": "https://github.com/FGRibreau/claudectx",
+              "license": "MIT",
+              "architecture": {
+                  "64bit": {
+                      "url": "https://github.com/FGRibreau/claudectx/releases/download/${{ github.ref_name }}/claudectx_windows_x86_64.zip",
+                      "hash": "${{ steps.checksum.outputs.hash }}"
+                  }
+              },
+              "bin": "claudectx.exe",
+              "checkver": "github",
+              "autoupdate": {
+                  "architecture": {
+                      "64bit": {
+                          "url": "https://github.com/FGRibreau/claudectx/releases/download/v\$version/claudectx_windows_x86_64.zip"
+                      }
+                  }
+              }
+          }
+          EOF
+
+      - name: Upload Scoop manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: scoop-manifest
+          path: scoop-claudectx.json
+
+      # Optional: Auto-PR to scoop-extras bucket
+      # - name: Submit to Scoop Main
+      #   uses: peter-evans/create-pull-request@v5
+      #   with:
+      #     token: ${{ secrets.SCOOP_PR_TOKEN }}
+      #     ...

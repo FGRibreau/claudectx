@@ -1,0 +1,12 @@
+/target
+Cargo.lock
+.claude/
+.claude
+
+# Packaging temp files
+*.nupkg
+*.deb
+*.tar.gz
+*.zip
+packaging/chocolatey/*.nupkg
+scoop-claudectx.json

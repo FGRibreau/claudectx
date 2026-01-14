@@ -1,0 +1,21 @@
+{
+    "version": "$version$",
+    "description": "Launch Claude Code with different profiles",
+    "homepage": "https://github.com/FGRibreau/claudectx",
+    "license": "MIT",
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/FGRibreau/claudectx/releases/download/v$version$/claudectx_windows_x86_64.zip",
+            "hash": "$hash64$"
+        }
+    },
+    "bin": "claudectx.exe",
+    "checkver": "github",
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/FGRibreau/claudectx/releases/download/v$version/claudectx_windows_x86_64.zip"
+            }
+        }
+    }
+}

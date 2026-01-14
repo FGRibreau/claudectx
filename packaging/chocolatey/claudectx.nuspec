@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>claudectx</id>
+    <version>0.1.0</version>
+    <title>claudectx</title>
+    <authors>Francois-Guillaume Ribreau</authors>
+    <owners>FGRibreau</owners>
+    <projectUrl>https://github.com/FGRibreau/claudectx</projectUrl>
+    <licenseUrl>https://github.com/FGRibreau/claudectx/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectSourceUrl>https://github.com/FGRibreau/claudectx</projectSourceUrl>
+    <bugTrackerUrl>https://github.com/FGRibreau/claudectx/issues</bugTrackerUrl>
+    <tags>claude anthropic cli context profiles launcher</tags>
+    <summary>Launch Claude Code with different profiles</summary>
+    <description>claudectx manages multiple Claude Code profiles (Claude Max, Claude Team, personal) by saving and launching with different configurations. Each profile is a complete claude.json config with its own account, MCP servers, and settings. Inspired by kubectx.</description>
+    <releaseNotes>https://github.com/FGRibreau/claudectx/releases/tag/v0.1.0</releaseNotes>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

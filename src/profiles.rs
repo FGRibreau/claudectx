@@ -111,8 +111,7 @@ pub fn switch_to_profile(name: &str) {
     // Create symlink
     #[cfg(unix)]
     {
-        std::os::unix::fs::symlink(&profile_path, &config_path)
-            .expect("Failed to create symlink");
+        std::os::unix::fs::symlink(&profile_path, &config_path).expect("Failed to create symlink");
     }
 
     #[cfg(windows)]

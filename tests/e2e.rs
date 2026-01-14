@@ -75,8 +75,7 @@ impl TestEnv {
 
     /// Read a profile file
     fn read_profile(&self, name: &str) -> serde_json::Value {
-        let content =
-            fs::read_to_string(self.profile_path(name)).expect("Failed to read profile");
+        let content = fs::read_to_string(self.profile_path(name)).expect("Failed to read profile");
         serde_json::from_str(&content).expect("Failed to parse profile")
     }
 
@@ -102,7 +101,9 @@ impl TestEnv {
             return false;
         }
         let target = fs::read_link(&config_path).ok();
-        target.map(|t| t == self.profile_path(profile_name)).unwrap_or(false)
+        target
+            .map(|t| t == self.profile_path(profile_name))
+            .unwrap_or(false)
     }
 
     /// Run claudectx command with this test environment
@@ -140,7 +141,9 @@ fn test_help_flag() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Switch Claude Code profiles via symlinks"))
+        .stdout(predicate::str::contains(
+            "Switch Claude Code profiles via symlinks",
+        ))
         .stdout(predicate::str::contains("list"))
         .stdout(predicate::str::contains("save"))
         .stdout(predicate::str::contains("delete"));
@@ -163,7 +166,9 @@ fn test_help_subcommand() {
         .arg("help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Switch Claude Code profiles via symlinks"));
+        .stdout(predicate::str::contains(
+            "Switch Claude Code profiles via symlinks",
+        ));
 }
 
 // =============================================================================
@@ -220,7 +225,10 @@ fn test_list_marks_current_profile_with_asterisk() {
     // The current profile should be marked with *
     let output_str = String::from_utf8_lossy(&output.get_output().stdout);
     assert!(
-        output_str.contains("work") && output_str.lines().any(|l| l.contains("work") && l.contains(" *")),
+        output_str.contains("work")
+            && output_str
+                .lines()
+                .any(|l| l.contains("work") && l.contains(" *")),
         "Current profile 'work' should be marked with asterisk"
     );
 }
@@ -239,7 +247,9 @@ fn test_save_creates_new_profile() {
         .args(["save", "alice-profile"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Saved current config as 'alice-profile'"));
+        .stdout(predicate::str::contains(
+            "Saved current config as 'alice-profile'",
+        ));
 
     // Verify profile file was created
     assert!(env.profile_path("alice-profile").exists());
@@ -260,7 +270,9 @@ fn test_save_slugifies_profile_name() {
         .args(["save", "My Work Profile"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Saved current config as 'my-work-profile'"));
+        .stdout(predicate::str::contains(
+            "Saved current config as 'my-work-profile'",
+        ));
 
     // Verify slugified filename
     assert!(env.profile_path("my-work-profile").exists());
@@ -276,7 +288,9 @@ fn test_save_slugifies_special_characters() {
         .args(["save", "FG@Company"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Saved current config as 'fg-company'"));
+        .stdout(predicate::str::contains(
+            "Saved current config as 'fg-company'",
+        ));
 
     assert!(env.profile_path("fg-company").exists());
 }
@@ -364,7 +378,9 @@ fn test_no_args_first_launch_no_profiles() {
     env.cmd()
         .assert()
         .success()
-        .stdout(predicate::str::contains("Current account: User firstuser @ Org firstuser"))
+        .stdout(predicate::str::contains(
+            "Current account: User firstuser @ Org firstuser",
+        ))
         .stdout(predicate::str::contains("No profiles saved yet"))
         .stdout(predicate::str::contains("claudectx save"));
 }
@@ -452,10 +468,7 @@ fn test_switch_nonexistent_profile_panics() {
     // Try to switch to nonexistent profile (will prompt to create)
     // Since we can't interact with prompts in tests, this should fail
     // The test binary runs without a TTY so dialoguer will fail
-    env.cmd()
-        .arg("nonexistent")
-        .assert()
-        .failure();
+    env.cmd().arg("nonexistent").assert().failure();
 }
 
 // =============================================================================
@@ -503,7 +516,9 @@ fn test_workflow_save_list_switch_delete() {
         .arg("test-profile")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Switched to profile 'test-profile'"));
+        .stdout(predicate::str::contains(
+            "Switched to profile 'test-profile'",
+        ));
 
     // Verify symlink
     assert!(env.is_symlink_to_profile("test-profile"));
@@ -551,7 +566,9 @@ fn test_workflow_multiple_accounts() {
     assert!(stdout.contains("personal"));
     assert!(stdout.contains("side-project"));
     // work should be marked with *
-    assert!(stdout.lines().any(|l| l.contains("work") && l.contains(" *")));
+    assert!(stdout
+        .lines()
+        .any(|l| l.contains("work") && l.contains(" *")));
 }
 
 #[test]
@@ -588,7 +605,9 @@ fn test_save_help() {
         .args(["save", "--help"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Save current config as a new profile"))
+        .stdout(predicate::str::contains(
+            "Save current config as a new profile",
+        ))
         .stdout(predicate::str::contains("<NAME>"));
 }
 

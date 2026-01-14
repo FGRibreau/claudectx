@@ -65,8 +65,7 @@ fn main() {
 
                 let current_profile = get_current_profile();
 
-                select_profile(&profiles, current_profile.as_deref())
-                    .expect("No profile selected")
+                select_profile(&profiles, current_profile.as_deref()).expect("No profile selected")
             });
 
             let path = get_profile_path(&profile_name);

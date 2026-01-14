@@ -2,7 +2,7 @@
 
 # claudectx
 
-**Launch Claude Code with different profiles**
+**Switch Claude Code profiles via symlinks**
 
 <br/>
 
@@ -23,14 +23,19 @@
 
 ## What is this?
 
-**claudectx** manages multiple Claude Code profiles (Claude Max, Claude Team, personal) by saving and launching with different configurations. Each profile is a complete `claude.json` config with its own account, MCP servers, and settings. Inspired by [kubectx](https://github.com/FGRibreau/kubectx-rs).
+**claudectx** manages multiple Claude Code profiles (Claude Max, Claude Team, personal) by switching `~/.claude.json` between saved configurations using symlinks. Each profile is a complete `claude.json` config with its own account, MCP servers, and settings. Inspired by [kubectx](https://github.com/FGRibreau/kubectx-rs).
+
+## How it works
+
+1. **Save**: `claudectx save work` copies `~/.claude.json` to `~/.claudectx/work.claude.json`
+2. **Switch**: `claudectx work` makes `~/.claude.json` a symlink → `~/.claudectx/work.claude.json`
+3. **Use**: Run `claude` normally – it reads from the symlinked profile
 
 ## Features
 
-- **Direct launch** - Run `claudectx profile` to launch Claude with that profile
+- **Symlink switching** - Fast profile switching without copying files
 - **Save profiles** - Store complete Claude configurations locally
 - **Quick switch** - Interactive selection with arrow keys
-- **Pass-through args** - Forward arguments to claude via `--`
 - **Auto-slugify** - Profile names are normalized (`FG@Work` → `fg-work`)
 - **Zero config** - Works out of the box
 
@@ -81,14 +86,14 @@
 # 1. Install
 brew install FGRibreau/tap/claudectx
 
-# 2. Save your current account
+# 2. Save your current account as a profile
 claudectx save work
 
-# 3. Launch Claude with profile
+# 3. Switch to profile (creates symlink)
 claudectx work
 
-# Or select interactively
-claudectx
+# 4. Run Claude normally
+claude
 ```
 
 ---
@@ -184,9 +189,8 @@ sudo cp target/release/claudectx /usr/local/bin/
 
 | Command | Description |
 |---------|-------------|
-| `claudectx` | Interactive profile selection, then launch Claude |
-| `claudectx <profile>` | Launch Claude with specified profile |
-| `claudectx <profile> -- <args>` | Launch with profile and extra arguments |
+| `claudectx` | Interactive profile selection, then switch |
+| `claudectx <profile>` | Switch to specified profile |
 | `claudectx list` | List all saved profiles |
 | `claudectx save <name>` | Save current config as profile |
 | `claudectx delete <name>` | Delete a profile |
@@ -194,19 +198,16 @@ sudo cp target/release/claudectx /usr/local/bin/
 ### Examples
 
 ```sh
-# Launch Claude with "work" profile
+# Switch to "work" profile
 claudectx work
-
-# Launch with extra arguments
-claudectx work -- --dangerously-skip-permissions
 
 # Save current ~/.claude.json as "personal" profile
 claudectx save personal
 
-# Interactive selection then launch
+# Interactive selection then switch
 claudectx
 
-# List all profiles
+# List all profiles (* marks current)
 claudectx list
 # Output:
 # work - FG @ Company *
@@ -228,6 +229,12 @@ Profiles are stored as individual JSON files in `~/.claudectx/`:
 └── side-project.claude.json
 ```
 
+When you switch profiles, `~/.claude.json` becomes a symlink to the selected profile:
+
+```
+~/.claude.json -> ~/.claudectx/work.claude.json
+```
+
 Each profile is a complete copy of `~/.claude.json`, including:
 - OAuth account (email, organization)
 - MCP servers configuration
@@ -240,14 +247,6 @@ Profile names are automatically slugified:
 - `My Work Profile` → `my-work-profile`
 - `FG@Company` → `fg-company`
 - `Test Name` → `test-name`
-
----
-
-## How it works
-
-1. **Save**: `claudectx save work` copies `~/.claude.json` to `~/.claudectx/work.claude.json`
-2. **Launch**: `claudectx work` runs `claude --settings ~/.claudectx/work.claude.json`
-3. **Select**: `claudectx` shows an interactive picker, then launches the selected profile
 
 ---
 

@@ -95,6 +95,16 @@ impl TestEnv {
             .collect()
     }
 
+    /// Check if .claude.json is a symlink pointing to a specific profile
+    fn is_symlink_to_profile(&self, profile_name: &str) -> bool {
+        let config_path = self.claude_config_path();
+        if !config_path.is_symlink() {
+            return false;
+        }
+        let target = fs::read_link(&config_path).ok();
+        target.map(|t| t == self.profile_path(profile_name)).unwrap_or(false)
+    }
+
     /// Run claudectx command with this test environment
     fn cmd(&self) -> assert_cmd::Command {
         let mut cmd = Command::cargo_bin("claudectx").expect("Failed to find binary");
@@ -130,7 +140,7 @@ fn test_help_flag() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Launch Claude Code with different profiles"))
+        .stdout(predicate::str::contains("Switch Claude Code profiles via symlinks"))
         .stdout(predicate::str::contains("list"))
         .stdout(predicate::str::contains("save"))
         .stdout(predicate::str::contains("delete"));
@@ -153,7 +163,7 @@ fn test_help_subcommand() {
         .arg("help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Launch Claude Code with different profiles"));
+        .stdout(predicate::str::contains("Switch Claude Code profiles via symlinks"));
 }
 
 // =============================================================================
@@ -197,35 +207,22 @@ fn test_list_with_profiles() {
 #[test]
 fn test_list_marks_current_profile_with_asterisk() {
     let env = TestEnv::new();
-    // Set current account to match one of the profiles
-    let current_account = sample_account("work");
-    env.create_claude_config(&current_account);
 
+    // Create profiles
     env.create_profile("work", &sample_account("work"));
     env.create_profile("personal", &sample_account("personal"));
+
+    // Switch to work profile (creates symlink)
+    env.cmd().arg("work").assert().success();
 
     let output = env.cmd().arg("list").assert().success();
 
     // The current profile should be marked with *
     let output_str = String::from_utf8_lossy(&output.get_output().stdout);
     assert!(
-        output_str.contains("work") && output_str.contains(" *"),
-        "Current profile should be marked with asterisk"
+        output_str.contains("work") && output_str.lines().any(|l| l.contains("work") && l.contains(" *")),
+        "Current profile 'work' should be marked with asterisk"
     );
-}
-
-#[test]
-fn test_list_fails_without_claude_config() {
-    let env = TestEnv::new();
-    // No .claude.json - but we have profiles that need to check current
-
-    env.create_profile("work", &sample_account("work"));
-
-    env.cmd()
-        .arg("list")
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("Failed to read Claude config"));
 }
 
 // =============================================================================
@@ -384,55 +381,100 @@ fn test_no_args_fails_without_claude_config() {
 }
 
 // =============================================================================
-// PROFILE NAME LAUNCH TESTS
+// SWITCH PROFILE TESTS
 // =============================================================================
 
-// Note: We can't fully test the claude launch because it uses exec() which replaces
-// the process. Interactive prompts also require a TTY which isn't available in tests.
+#[test]
+fn test_switch_creates_symlink() {
+    let env = TestEnv::new();
+    let account = sample_account("current");
+    env.create_claude_config(&account);
+
+    // Create a profile
+    env.create_profile("work", &sample_account("work"));
+
+    // Switch to profile
+    env.cmd()
+        .arg("work")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Switched to profile 'work'"));
+
+    // Verify symlink was created
+    assert!(env.is_symlink_to_profile("work"));
+}
+
+#[test]
+fn test_switch_replaces_existing_config() {
+    let env = TestEnv::new();
+    let account = sample_account("current");
+    env.create_claude_config(&account);
+
+    // Create profiles
+    env.create_profile("work", &sample_account("work"));
+
+    // Switch to profile - this should replace the regular file with a symlink
+    env.cmd().arg("work").assert().success();
+
+    // Verify symlink was created
+    assert!(env.is_symlink_to_profile("work"));
+}
+
+#[test]
+fn test_switch_between_profiles() {
+    let env = TestEnv::new();
+
+    // Create profiles
+    env.create_profile("work", &sample_account("work"));
+    env.create_profile("personal", &sample_account("personal"));
+
+    // Create initial config
+    let account = sample_account("initial");
+    env.create_claude_config(&account);
+
+    // Switch to work
+    env.cmd().arg("work").assert().success();
+    assert!(env.is_symlink_to_profile("work"));
+
+    // Switch to personal
+    env.cmd().arg("personal").assert().success();
+    assert!(env.is_symlink_to_profile("personal"));
+}
+
+#[test]
+fn test_switch_nonexistent_profile_panics() {
+    let env = TestEnv::new();
+
+    // Create a config file
+    let account = sample_account("current");
+    env.create_claude_config(&account);
+
+    // Try to switch to nonexistent profile (will prompt to create)
+    // Since we can't interact with prompts in tests, this should fail
+    // The test binary runs without a TTY so dialoguer will fail
+    env.cmd()
+        .arg("nonexistent")
+        .assert()
+        .failure();
+}
 
 // =============================================================================
 // EDGE CASES AND ERROR HANDLING
 // =============================================================================
 
 #[test]
-fn test_malformed_claude_config_panics() {
+fn test_malformed_profile_panics() {
     let env = TestEnv::new();
-    // Write invalid JSON
-    fs::write(env.claude_config_path(), "not valid json {{{")
-        .expect("Failed to write invalid config");
-
-    // Need profiles to exist so list command reads config
-    env.create_profile("test", &sample_account("test"));
+    // Write invalid JSON to profile
+    fs::create_dir_all(env.claudectx_dir()).expect("Failed to create dir");
+    fs::write(env.profile_path("bad"), "not valid json {{{")
+        .expect("Failed to write invalid profile");
 
     env.cmd()
         .arg("list")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Failed to parse Claude config JSON"));
-}
-
-#[test]
-fn test_claude_config_missing_oauth_account_panics() {
-    let env = TestEnv::new();
-    // Write valid JSON but missing oauthAccount
-    let config = json!({
-        "primaryApiKey": "sk-ant-test",
-        "hasCompletedOnboarding": true
-    });
-    fs::write(
-        env.claude_config_path(),
-        serde_json::to_string_pretty(&config).expect("serialize"),
-    )
-    .expect("Failed to write config");
-
-    // This will fail when trying to list with profiles
-    env.create_profile("test", &sample_account("test"));
-
-    env.cmd()
-        .arg("list")
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("oauthAccount field is missing"));
+        .stderr(predicate::str::contains("Failed to parse profile"));
 }
 
 // =============================================================================
@@ -440,7 +482,7 @@ fn test_claude_config_missing_oauth_account_panics() {
 // =============================================================================
 
 #[test]
-fn test_workflow_save_list_delete() {
+fn test_workflow_save_list_switch_delete() {
     let env = TestEnv::new();
     let account = sample_account("workflow");
     env.create_claude_config(&account);
@@ -456,13 +498,23 @@ fn test_workflow_save_list_delete() {
         .stdout(predicate::str::contains("test-profile"))
         .stdout(predicate::str::contains("User workflow"));
 
-    // 3. Delete the profile
+    // 3. Switch to the profile
+    env.cmd()
+        .arg("test-profile")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Switched to profile 'test-profile'"));
+
+    // Verify symlink
+    assert!(env.is_symlink_to_profile("test-profile"));
+
+    // 4. Delete the profile
     env.cmd()
         .args(["delete", "test-profile"])
         .assert()
         .success();
 
-    // 4. List again - should be empty
+    // 5. List again - should be empty
     env.cmd()
         .arg("list")
         .assert()
@@ -489,14 +541,17 @@ fn test_workflow_multiple_accounts() {
     env.create_claude_config(&side_account);
     env.cmd().args(["save", "side-project"]).assert().success();
 
-    // List all profiles
-    let output = env.cmd().arg("list").assert().success();
+    // Switch to work profile
+    env.cmd().arg("work").assert().success();
 
+    // List all profiles - work should be marked current
+    let output = env.cmd().arg("list").assert().success();
     let stdout = String::from_utf8_lossy(&output.get_output().stdout);
     assert!(stdout.contains("work"));
     assert!(stdout.contains("personal"));
     assert!(stdout.contains("side-project"));
-    assert!(stdout.contains(" *")); // current should be marked
+    // work should be marked with *
+    assert!(stdout.lines().any(|l| l.contains("work") && l.contains(" *")));
 }
 
 #[test]

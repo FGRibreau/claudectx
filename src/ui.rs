@@ -5,7 +5,7 @@ use crate::profiles::get_profile_path;
 
 /// Interactively select a profile from the list
 /// Returns the selected profile name, or None if cancelled
-pub fn select_profile(profiles: &[String], current_email: &str) -> Option<String> {
+pub fn select_profile(profiles: &[String], current_profile: Option<&str>) -> Option<String> {
     if profiles.is_empty() {
         println!("No profiles found. Use 'claudectx save <name>' to create one.");
         return None;
@@ -22,7 +22,7 @@ pub fn select_profile(profiles: &[String], current_email: &str) -> Option<String
             .expect("Failed to parse profile");
 
             let account = get_oauth_account(&config);
-            let marker = if account.email_address == current_email {
+            let marker = if current_profile == Some(name.as_str()) {
                 " *"
             } else {
                 ""
@@ -35,22 +35,8 @@ pub fn select_profile(profiles: &[String], current_email: &str) -> Option<String
         .collect();
 
     // Find current selection index (default to first if not found)
-    let default_index = profiles
-        .iter()
-        .position(|name| {
-            let path = get_profile_path(name);
-            let config: serde_json::Value = serde_json::from_str(
-                &std::fs::read_to_string(&path).unwrap_or_default(),
-            )
-            .unwrap_or_default();
-
-            config
-                .get("oauthAccount")
-                .and_then(|a| a.get("emailAddress"))
-                .and_then(|e| e.as_str())
-                .map(|e| e == current_email)
-                .unwrap_or(false)
-        })
+    let default_index = current_profile
+        .and_then(|current| profiles.iter().position(|name| name == current))
         .unwrap_or(0);
 
     let selection = Select::new()

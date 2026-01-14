@@ -1,13 +1,11 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::config::claude_config_path;
+use crate::config::{claude_config_path, home_dir};
 
 /// Get the profiles directory path (~/.claudectx/)
 pub fn profiles_dir() -> PathBuf {
-    dirs::home_dir()
-        .expect("Cannot find home directory")
-        .join(".claudectx")
+    home_dir().join(".claudectx")
 }
 
 /// Ensure the profiles directory exists

@@ -109,9 +109,9 @@ impl TestEnv {
     /// Run claudectx command with this test environment
     fn cmd(&self) -> assert_cmd::Command {
         let mut cmd = Command::cargo_bin("claudectx").expect("Failed to find binary");
-        // Set HOME for Unix and USERPROFILE for Windows (dirs crate uses these)
-        cmd.env("HOME", self.home_path());
-        cmd.env("USERPROFILE", self.home_path());
+        // Use CLAUDECTX_HOME for reliable cross-platform home directory override
+        // The dirs crate doesn't reliably respect HOME/USERPROFILE when set for child processes
+        cmd.env("CLAUDECTX_HOME", self.home_path());
         assert_cmd::Command::from_std(cmd)
     }
 }

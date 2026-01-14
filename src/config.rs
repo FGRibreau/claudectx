@@ -16,11 +16,19 @@ pub struct OAuthAccount {
     pub workspace_role: Option<String>,
 }
 
+/// Get the home directory, with CLAUDECTX_HOME override for testing.
+/// This is needed because dirs::home_dir() doesn't respect USERPROFILE
+/// environment variable when set for child processes on Windows.
+pub fn home_dir() -> PathBuf {
+    if let Ok(home) = std::env::var("CLAUDECTX_HOME") {
+        return PathBuf::from(home);
+    }
+    dirs::home_dir().expect("Failed to find home directory")
+}
+
 /// Get the path to ~/.claude.json
 pub fn claude_config_path() -> PathBuf {
-    dirs::home_dir()
-        .expect("Failed to find home directory")
-        .join(".claude.json")
+    home_dir().join(".claude.json")
 }
 
 /// Read the Claude config file as a JSON Value (preserves all fields)

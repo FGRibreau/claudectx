@@ -26,10 +26,12 @@ pub fn claude_config_path() -> PathBuf {
 /// Read the Claude config file as a JSON Value (preserves all fields)
 pub fn read_claude_config() -> serde_json::Value {
     let path = claude_config_path();
-    let content = fs::read_to_string(&path).expect(&format!(
-        "Failed to read Claude config at {:?} - is Claude Code installed?",
-        path
-    ));
+    let content = fs::read_to_string(&path).unwrap_or_else(|_| {
+        panic!(
+            "Failed to read Claude config at {:?} - is Claude Code installed?",
+            path
+        )
+    });
     serde_json::from_str(&content).expect("Failed to parse Claude config JSON")
 }
 

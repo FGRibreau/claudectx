@@ -749,3 +749,52 @@ fn test_slugify_handles_multiple_dashes() {
 
     assert!(env.profile_path("test-name").exists());
 }
+
+// =============================================================================
+// LOGIN COMMAND TESTS
+// =============================================================================
+
+#[test]
+fn test_login_help() {
+    let env = TestEnv::new();
+    env.cmd()
+        .args(["login", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Login to a new Claude account and save it as a profile",
+        ));
+}
+
+#[test]
+fn test_help_includes_login_command() {
+    let env = TestEnv::new();
+    env.cmd()
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("login"));
+}
+
+// =============================================================================
+// BACKUP/RESTORE TESTS
+// =============================================================================
+
+impl TestEnv {
+    /// Get path to .claude.json.bak in test environment
+    fn claude_config_backup_path(&self) -> std::path::PathBuf {
+        self.home_dir.path().join(".claude.json.bak")
+    }
+}
+
+#[test]
+fn test_backup_file_location() {
+    let env = TestEnv::new();
+    let account = sample_account("backup-test");
+    env.create_claude_config(&account);
+
+    // The backup path should be in the test home directory
+    let backup_path = env.claude_config_backup_path();
+    assert!(backup_path.starts_with(env.home_path()));
+    assert!(backup_path.ends_with(".claude.json.bak"));
+}

@@ -1,5 +1,6 @@
 mod config;
 mod launcher;
+mod login;
 mod profiles;
 mod ui;
 
@@ -8,6 +9,7 @@ use dialoguer::Confirm;
 
 use config::{get_oauth_account, read_claude_config};
 use launcher::switch_and_launch_claude;
+use login::run_login_workflow;
 use profiles::{
     delete_profile, get_current_profile, get_profile_path, list_profiles, profile_exists,
     save_profile, slugify,
@@ -44,6 +46,9 @@ enum Commands {
         /// Profile name
         name: String,
     },
+
+    /// Login to a new Claude account and save it as a profile
+    Login,
 }
 
 fn main() {
@@ -151,6 +156,9 @@ fn main() {
 
             delete_profile(&name);
             println!("Deleted profile '{}'", slugify(&name));
+        }
+        Some(Commands::Login) => {
+            run_login_workflow();
         }
     }
 }

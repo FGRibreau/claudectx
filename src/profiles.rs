@@ -129,6 +129,52 @@ pub fn get_current_profile() -> Option<String> {
     target_name.strip_suffix(".claude.json").map(String::from)
 }
 
+/// Get the backup path for claude.json
+pub fn claude_config_backup_path() -> PathBuf {
+    home_dir().join(".claude.json.bak")
+}
+
+/// Backup ~/.claude.json to ~/.claude.json.bak if it exists
+/// Returns true if a backup was created, false if no config existed
+pub fn backup_claude_config() -> bool {
+    let config_path = claude_config_path();
+    let backup_path = claude_config_backup_path();
+
+    if config_path.exists() || config_path.is_symlink() {
+        // Read actual content (follows symlink)
+        let content = fs::read_to_string(&config_path).expect("Failed to read Claude config");
+        fs::write(&backup_path, content).expect("Failed to create backup");
+        // Remove the original (or symlink)
+        fs::remove_file(&config_path).expect("Failed to remove original config");
+        true
+    } else {
+        false
+    }
+}
+
+/// Restore ~/.claude.json from backup, or remove the current config if no backup exists
+/// - If backup exists: restore it and remove backup
+/// - If no backup: just remove the current config (if any)
+pub fn restore_claude_config(had_backup: bool) {
+    let config_path = claude_config_path();
+    let backup_path = claude_config_backup_path();
+
+    // Remove current config if it exists
+    if config_path.exists() || config_path.is_symlink() {
+        fs::remove_file(&config_path).expect("Failed to remove current config");
+    }
+
+    if had_backup && backup_path.exists() {
+        fs::rename(&backup_path, &config_path).expect("Failed to restore backup");
+    }
+}
+
+/// Check if claude.json exists (as file or symlink)
+pub fn claude_config_exists() -> bool {
+    let config_path = claude_config_path();
+    config_path.exists() || config_path.is_symlink()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -155,5 +201,12 @@ mod tests {
     fn test_slugify_multiple_dashes() {
         assert_eq!(slugify("test---name"), "test-name");
         assert_eq!(slugify("a - b - c"), "a-b-c");
+    }
+
+    #[test]
+    fn test_backup_path() {
+        // Test that backup path is derived correctly
+        let backup_path = super::claude_config_backup_path();
+        assert!(backup_path.to_string_lossy().ends_with(".claude.json.bak"));
     }
 }

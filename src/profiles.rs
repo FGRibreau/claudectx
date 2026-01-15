@@ -56,7 +56,6 @@ pub fn get_profile_path(name: &str) -> PathBuf {
 }
 
 /// Save current ~/.claude.json as a profile
-/// If ~/.claude.json is a symlink, copy the target file
 pub fn save_profile(name: &str) {
     let source = claude_config_path();
     if !source.exists() {
@@ -69,7 +68,6 @@ pub fn save_profile(name: &str) {
     ensure_profiles_dir();
     let dest = get_profile_path(name);
 
-    // Read the content (follows symlinks automatically)
     let content = fs::read_to_string(&source).unwrap_or_else(|_| {
         panic!(
             "Failed to read Claude config at {:?} - is Claude Code installed?",
@@ -77,7 +75,6 @@ pub fn save_profile(name: &str) {
         )
     });
 
-    // Write to the profile file
     fs::write(&dest, content).expect("Failed to save profile");
 }
 
@@ -90,46 +87,6 @@ pub fn delete_profile(name: &str) {
 /// Check if a profile exists
 pub fn profile_exists(name: &str) -> bool {
     get_profile_path(name).exists()
-}
-
-/// Switch to a profile by making ~/.claude.json a symlink to the profile
-pub fn switch_to_profile(name: &str) {
-    let profile_path = get_profile_path(name);
-    if !profile_path.exists() {
-        panic!("Profile '{}' not found", slugify(name));
-    }
-
-    let config_path = claude_config_path();
-
-    // Remove existing file/symlink if it exists
-    if config_path.exists() || config_path.is_symlink() {
-        fs::remove_file(&config_path).expect("Failed to remove existing config");
-    }
-
-    // Create symlink
-    #[cfg(unix)]
-    {
-        std::os::unix::fs::symlink(&profile_path, &config_path).expect("Failed to create symlink");
-    }
-
-    #[cfg(windows)]
-    {
-        std::os::windows::fs::symlink_file(&profile_path, &config_path)
-            .expect("Failed to create symlink");
-    }
-}
-
-/// Get the current profile name if ~/.claude.json is a symlink to a profile
-pub fn get_current_profile() -> Option<String> {
-    let config_path = claude_config_path();
-
-    if !config_path.is_symlink() {
-        return None;
-    }
-
-    let target = fs::read_link(&config_path).ok()?;
-    let target_name = target.file_name()?.to_string_lossy().to_string();
-    target_name.strip_suffix(".claude.json").map(String::from)
 }
 
 #[cfg(test)]

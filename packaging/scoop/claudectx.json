@@ -1,6 +1,6 @@
 {
     "version": "$version$",
-    "description": "Switch Claude Code profiles via symlinks",
+    "description": "Launch Claude Code with different profiles",
     "homepage": "https://github.com/FGRibreau/claudectx",
     "license": "MIT",
     "architecture": {

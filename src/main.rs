@@ -1,4 +1,5 @@
 mod config;
+mod launcher;
 mod profiles;
 mod ui;
 
@@ -6,17 +7,21 @@ use clap::{Parser, Subcommand};
 use dialoguer::Confirm;
 
 use config::{get_oauth_account, read_claude_config};
+use launcher::launch_claude;
 use profiles::{
-    delete_profile, get_current_profile, get_profile_path, list_profiles, profile_exists,
-    save_profile, slugify, switch_to_profile,
+    delete_profile, get_profile_path, list_profiles, profile_exists, save_profile, slugify,
 };
 use ui::select_profile;
 
 #[derive(Parser, Debug)]
-#[command(author, version, about = "Switch Claude Code profiles via symlinks", long_about = None)]
+#[command(author, version, about = "Launch Claude Code with different profiles", long_about = None)]
 struct Args {
-    /// Profile name to switch to (interactive selection if omitted)
+    /// Profile name to use (interactive selection if omitted)
     profile: Option<String>,
+
+    /// Extra arguments passed to claude (after --)
+    #[arg(last = true, num_args = 0..)]
+    claude_args: Vec<String>,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -45,7 +50,7 @@ fn main() {
 
     match args.command {
         None => {
-            // Switch mode
+            // Launch mode
             let profile_name = args.profile.unwrap_or_else(|| {
                 // Interactive selection
                 let profiles = list_profiles();
@@ -63,9 +68,7 @@ fn main() {
                     std::process::exit(0);
                 }
 
-                let current_profile = get_current_profile();
-
-                select_profile(&profiles, current_profile.as_deref()).expect("No profile selected")
+                select_profile(&profiles).expect("No profile selected")
             });
 
             let path = get_profile_path(&profile_name);
@@ -89,9 +92,8 @@ fn main() {
                 }
             }
 
-            switch_to_profile(&profile_name);
-            let slug = slugify(&profile_name);
-            println!("Switched to profile '{}'", slug);
+            // Launch claude with the profile settings
+            launch_claude(&path, &args.claude_args);
         }
         Some(Commands::List) => {
             let profiles = list_profiles();
@@ -101,8 +103,6 @@ fn main() {
                 return;
             }
 
-            let current_profile = get_current_profile();
-
             for name in profiles {
                 let path = get_profile_path(&name);
                 let config: serde_json::Value = serde_json::from_str(
@@ -111,14 +111,9 @@ fn main() {
                 .expect("Failed to parse profile");
 
                 let account = get_oauth_account(&config);
-                let marker = if current_profile.as_ref() == Some(&name) {
-                    " *"
-                } else {
-                    ""
-                };
                 println!(
-                    "{} - {} @ {}{}",
-                    name, account.display_name, account.organization_name, marker
+                    "{} - {} @ {}",
+                    name, account.display_name, account.organization_name
                 );
             }
         }

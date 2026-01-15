@@ -155,7 +155,7 @@ jobs:
           Priority: optional
           Architecture: ${{ matrix.arch }}
           Maintainer: Francois-Guillaume Ribreau <github@fgribreau.com>
-          Description: Switch Claude Code profiles via symlinks
+          Description: Launch Claude Code with different profiles
            claudectx manages multiple Claude Code profiles (Claude Max,
            Claude Team, personal) by saving and launching with different
            configurations. Each profile is a complete claude.json config.
@@ -320,7 +320,7 @@ jobs:
           cat > scoop-claudectx.json << EOF
           {
               "version": "$version",
-              "description": "Switch Claude Code profiles via symlinks",
+              "description": "Launch Claude Code with different profiles",
               "homepage": "https://github.com/FGRibreau/claudectx",
               "license": "MIT",
               "architecture": {

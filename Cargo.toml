@@ -2,7 +2,7 @@
 name = "claudectx"
 version = "0.1.0"
 authors = ["Francois-Guillaume RIBREAU <github@fgribreau.com>"]
-description = "Switch Claude Code profiles via symlinks"
+description = "Launch Claude Code with different profiles"
 repository = "https://github.com/FGRibreau/claudectx"
 homepage = "https://github.com/FGRibreau/claudectx"
 documentation = "https://docs.rs/claudectx"

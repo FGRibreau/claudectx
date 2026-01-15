@@ -12,8 +12,8 @@
     <projectSourceUrl>https://github.com/FGRibreau/claudectx</projectSourceUrl>
     <bugTrackerUrl>https://github.com/FGRibreau/claudectx/issues</bugTrackerUrl>
     <tags>claude anthropic cli context profiles launcher</tags>
-    <summary>Switch Claude Code profiles via symlinks</summary>
-    <description>claudectx manages multiple Claude Code profiles (Claude Max, Claude Team, personal) by switching ~/.claude.json between saved configurations using symlinks. Each profile is a complete claude.json config with its own account, MCP servers, and settings. Inspired by kubectx.</description>
+    <summary>Launch Claude Code with different profiles</summary>
+    <description>claudectx manages multiple Claude Code profiles (Claude Max, Claude Team, personal) and launches Claude with the selected profile using claude --settings. Each profile is a complete claude.json config with its own account, MCP servers, and settings. Inspired by kubectx.</description>
     <releaseNotes>https://github.com/FGRibreau/claudectx/releases/tag/v0.1.0</releaseNotes>
   </metadata>
   <files>

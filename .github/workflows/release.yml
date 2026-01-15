@@ -276,8 +276,9 @@ jobs:
           $nuspec = $nuspec -replace '\$version\$', $version
           Set-Content packaging/chocolatey/claudectx.nuspec $nuspec
 
-          # Update install script with checksum
+          # Update install script with version and checksum
           $install = Get-Content packaging/chocolatey/tools/chocolateyinstall.ps1 -Raw
+          $install = $install -replace '\$version\$', $version
           $install = $install -replace '\$checksum64\$', '${{ steps.checksum.outputs.hash }}'
           Set-Content packaging/chocolatey/tools/chocolateyinstall.ps1 $install
 

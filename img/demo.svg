@@ -60,22 +60,23 @@
     <rect width="200" height="45" rx="16" fill="url(#claudeGrad)"/>
     <rect y="33" width="200" height="12" fill="url(#claudeGrad)"/>
 
-    <!-- File icon -->
+    <!-- Symlink icon -->
     <g transform="translate(80, 10)">
-      <rect x="0" y="0" width="32" height="24" rx="4" fill="none" stroke="white" stroke-width="2"/>
-      <path d="M 8 8 L 24 8 M 8 12 L 20 12 M 8 16 L 16 16" stroke="white" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 0 12 L 12 12" stroke="white" stroke-width="2" stroke-linecap="round"/>
+      <path d="M 8 8 L 12 12 L 8 16" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="16" y="4" width="16" height="16" rx="3" fill="none" stroke="white" stroke-width="2"/>
     </g>
 
     <!-- Title -->
     <text x="100" y="68" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#1e293b">~/.claude.json</text>
-    <text x="100" y="86" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#64748b">Current config</text>
+    <text x="100" y="86" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#64748b">Symlink to profile</text>
 
-    <!-- Account info box -->
+    <!-- Symlink info box -->
     <g transform="translate(15, 100)">
       <rect width="170" height="55" rx="8" fill="#f59e0b" fill-opacity="0.08"/>
-      <text x="85" y="18" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="600" fill="#d97706">oauthAccount + settings</text>
-      <text x="85" y="34" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" fill="#92400e">FG @ FGRibreau</text>
-      <text x="85" y="47" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" fill="#a16207">MCP servers, API keys...</text>
+      <text x="85" y="18" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="600" fill="#d97706">symlink target</text>
+      <text x="85" y="34" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" fill="#92400e">~/.claudectx/work.claude.json</text>
+      <text x="85" y="47" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" fill="#a16207">Switched by claudectx</text>
     </g>
   </g>
 
@@ -155,18 +156,18 @@
 
   <!-- ==================== ANIMATED ARROWS ==================== -->
 
-  <!-- Arrow: claude.json -> claudectx (save) -->
+  <!-- Arrow: claudectx -> claude.json (symlink) -->
   <g>
-    <path d="M 245 140 L 345 140" stroke="#e2e8f0" stroke-width="2" fill="none"/>
-    <path d="M 245 140 L 345 140" stroke="url(#flowRight)" stroke-width="3" fill="none"/>
-    <path d="M 340 135 L 350 140 L 340 145" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <animate attributeName="opacity" values="0.3;1;0.3" dur="2s" repeatCount="indefinite"/>
+    <path d="M 345 140 L 245 140" stroke="#e2e8f0" stroke-width="2" fill="none"/>
+    <path d="M 345 140 L 245 140" stroke="url(#flowLaunch)" stroke-width="3" fill="none"/>
+    <path d="M 250 135 L 240 140 L 250 145" fill="none" stroke="#a855f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <animate attributeName="opacity" values="0.3;1;0.3" dur="1.5s" repeatCount="indefinite"/>
     </path>
-    <text x="295" y="132" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" fill="#6366f1">save</text>
+    <text x="295" y="132" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" fill="#a855f7">symlink</text>
     <!-- Floating particle -->
-    <circle r="3" fill="#6366f1" opacity="0">
-      <animateMotion dur="2s" repeatCount="indefinite" path="M 245 140 L 345 140"/>
-      <animate attributeName="opacity" values="0;0.9;0.9;0" dur="2s" repeatCount="indefinite"/>
+    <circle r="3" fill="#a855f7" opacity="0">
+      <animateMotion dur="1.5s" repeatCount="indefinite" path="M 345 140 L 245 140"/>
+      <animate attributeName="opacity" values="0;0.9;0.9;0" dur="1.5s" repeatCount="indefinite"/>
     </circle>
   </g>
 
@@ -200,5 +201,5 @@
 
   <!-- ==================== BOTTOM LABEL ==================== -->
   <text x="450" y="255" text-anchor="middle" font-family="'SF Mono', 'Fira Code', monospace" font-size="12" fill="#64748b">claudectx work</text>
-  <text x="450" y="270" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">→ claude --settings ~/.claudectx/work.claude.json</text>
+  <text x="450" y="270" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#94a3b8">→ symlink ~/.claude.json → profile, then launch claude</text>
 </svg>

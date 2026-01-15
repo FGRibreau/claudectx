@@ -23,18 +23,19 @@
 
 ## What is this?
 
-**claudectx** manages multiple Claude Code profiles (Claude Max, Claude Team, personal) and launches Claude with the selected profile using `claude --settings`. Each profile is a complete `claude.json` config with its own account, MCP servers, and settings. Inspired by [kubectx](https://github.com/FGRibreau/kubectx-rs).
+**claudectx** manages multiple Claude Code profiles (Claude Max, Claude Team, personal) and launches Claude with the selected profile. Each profile is a complete `claude.json` config with its own account, MCP servers, and settings. Inspired by [kubectx](https://github.com/FGRibreau/kubectx-rs).
 
 ## How it works
 
 1. **Save**: `claudectx save work` copies `~/.claude.json` to `~/.claudectx/work.claude.json`
-2. **Launch**: `claudectx work` runs `claude --settings ~/.claudectx/work.claude.json`
+2. **Launch**: `claudectx work` switches `~/.claude.json` symlink → profile, then launches `claude`
 
-That's it! No symlinks, no config modifications. Just direct launching with the right profile.
+The symlink ensures Claude reads the correct account configuration.
 
 ## Features
 
-- **Direct launch** - Launches Claude with `--settings` flag
+- **Profile switching** - Symlink-based switching for proper account isolation
+- **Direct launch** - Launches Claude automatically after switching
 - **Save profiles** - Store complete Claude configurations locally
 - **Quick switch** - Interactive selection with arrow keys
 - **Pass-through args** - Forward arguments to Claude: `claudectx work -- --dangerously-skip-permissions`
@@ -189,9 +190,9 @@ sudo cp target/release/claudectx /usr/local/bin/
 | Command | Description |
 |---------|-------------|
 | `claudectx` | Interactive profile selection, then launch Claude |
-| `claudectx <profile>` | Launch Claude with specified profile |
+| `claudectx <profile>` | Switch to profile and launch Claude |
 | `claudectx <profile> -- <args>` | Launch Claude with profile and extra arguments |
-| `claudectx list` | List all saved profiles |
+| `claudectx list` | List all saved profiles (* marks current) |
 | `claudectx save <name>` | Save current config as profile |
 | `claudectx delete <name>` | Delete a profile |
 
@@ -210,10 +211,10 @@ claudectx save personal
 # Interactive selection then launch
 claudectx
 
-# List all profiles
+# List all profiles (* marks current)
 claudectx list
 # Output:
-# work - FG @ Company
+# work - FG @ Company *
 # personal - FG @ Personal
 ```
 
@@ -232,11 +233,9 @@ Profiles are stored as individual JSON files in `~/.claudectx/`:
 └── side-project.claude.json
 ```
 
-When you run `claudectx <profile>`, it launches:
-
-```sh
-claude --settings ~/.claudectx/<profile>.claude.json
-```
+When you run `claudectx <profile>`:
+1. `~/.claude.json` becomes a symlink → `~/.claudectx/<profile>.claude.json`
+2. Claude is launched and reads from the symlinked config
 
 Each profile is a complete copy of `~/.claude.json`, including:
 - OAuth account (email, organization)

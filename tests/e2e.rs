@@ -5,7 +5,7 @@
 //!
 //! Note: Tests that would launch claude are limited since claude is not
 //! installed in the CI environment. We test save/list/delete thoroughly
-//! and verify that launch attempts fail appropriately when claude is unavailable.
+//! and verify symlink creation works correctly.
 
 use assert_cmd::prelude::*;
 use predicates::prelude::*;
@@ -96,6 +96,18 @@ impl TestEnv {
                 name.strip_suffix(".claude.json").map(String::from)
             })
             .collect()
+    }
+
+    /// Check if .claude.json is a symlink pointing to a specific profile
+    fn is_symlink_to_profile(&self, profile_name: &str) -> bool {
+        let config_path = self.claude_config_path();
+        if !config_path.is_symlink() {
+            return false;
+        }
+        let target = fs::read_link(&config_path).ok();
+        target
+            .map(|t| t == self.profile_path(profile_name))
+            .unwrap_or(false)
     }
 
     /// Run claudectx command with this test environment
@@ -199,6 +211,36 @@ fn test_list_with_profiles() {
         .stdout(predicate::str::contains("personal"))
         .stdout(predicate::str::contains("User work"))
         .stdout(predicate::str::contains("User personal"));
+}
+
+#[test]
+fn test_list_marks_current_profile_with_asterisk() {
+    let env = TestEnv::new();
+
+    // Create profiles
+    env.create_profile("work", &sample_account("work"));
+    env.create_profile("personal", &sample_account("personal"));
+
+    // Create symlink to work profile manually (simulating previous switch)
+    let config_path = env.claude_config_path();
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(env.profile_path("work"), &config_path)
+        .expect("Failed to create symlink");
+    #[cfg(windows)]
+    std::os::windows::fs::symlink_file(env.profile_path("work"), &config_path)
+        .expect("Failed to create symlink");
+
+    let output = env.cmd().arg("list").assert().success();
+
+    // The current profile should be marked with *
+    let output_str = String::from_utf8_lossy(&output.get_output().stdout);
+    assert!(
+        output_str.contains("work")
+            && output_str
+                .lines()
+                .any(|l| l.contains("work") && l.contains(" *")),
+        "Current profile 'work' should be marked with asterisk"
+    );
 }
 
 // =============================================================================
@@ -365,7 +407,7 @@ fn test_no_args_fails_without_claude_config() {
 }
 
 // =============================================================================
-// LAUNCH PROFILE TESTS
+// LAUNCH PROFILE TESTS (symlink + claude launch)
 // =============================================================================
 
 #[test]
@@ -383,7 +425,7 @@ fn test_launch_nonexistent_profile_panics() {
 }
 
 #[test]
-fn test_launch_existing_profile_attempts_claude() {
+fn test_launch_creates_symlink_then_attempts_claude() {
     let env = TestEnv::new();
     let account = sample_account("current");
     env.create_claude_config(&account);
@@ -391,19 +433,51 @@ fn test_launch_existing_profile_attempts_claude() {
     // Create a profile
     env.create_profile("work", &sample_account("work"));
 
-    // This test verifies the profile lookup works.
-    // The command will either:
-    // - Fail with "Failed to launch claude" if claude is not installed
-    // - Launch claude (which may return an error due to missing input/args)
-    // Either way, it shouldn't panic from profile lookup issues.
+    // Launch - this should:
+    // 1. Create symlink ~/.claude.json -> ~/.claudectx/work.claude.json
+    // 2. Try to launch claude (which will fail in CI since claude isn't installed)
     let output = env.cmd().arg("work").assert();
 
-    // The profile file should still exist (wasn't deleted or corrupted)
+    // The symlink should have been created before attempting to launch claude
+    assert!(
+        env.is_symlink_to_profile("work"),
+        "Symlink should point to work profile"
+    );
+
+    // The profile file should still exist
     assert!(env.profile_path("work").exists());
 
-    // We just verify it didn't panic from our code (profile lookup worked)
-    // The exit could be failure (claude not found) or success (claude launched)
+    // We don't assert success/failure because:
+    // - In CI: claude isn't installed, so launch fails
+    // - Locally: claude may be installed and actually launch
     let _ = output;
+}
+
+#[test]
+fn test_launch_switches_symlink_between_profiles() {
+    let env = TestEnv::new();
+
+    // Create profiles
+    env.create_profile("work", &sample_account("work"));
+    env.create_profile("personal", &sample_account("personal"));
+
+    // Create initial config
+    let account = sample_account("initial");
+    env.create_claude_config(&account);
+
+    // Launch work profile - creates symlink
+    let _ = env.cmd().arg("work").assert();
+    assert!(
+        env.is_symlink_to_profile("work"),
+        "Should symlink to work profile"
+    );
+
+    // Launch personal profile - switches symlink
+    let _ = env.cmd().arg("personal").assert();
+    assert!(
+        env.is_symlink_to_profile("personal"),
+        "Should symlink to personal profile"
+    );
 }
 
 // =============================================================================
@@ -430,7 +504,7 @@ fn test_malformed_profile_panics() {
 // =============================================================================
 
 #[test]
-fn test_workflow_save_list_delete() {
+fn test_workflow_save_list_launch_delete() {
     let env = TestEnv::new();
     let account = sample_account("workflow");
     env.create_claude_config(&account);
@@ -446,13 +520,24 @@ fn test_workflow_save_list_delete() {
         .stdout(predicate::str::contains("test-profile"))
         .stdout(predicate::str::contains("User workflow"));
 
-    // 3. Delete the profile
+    // 3. Launch the profile (creates symlink)
+    let _ = env.cmd().arg("test-profile").assert();
+    assert!(env.is_symlink_to_profile("test-profile"));
+
+    // 4. List again - test-profile should be marked with *
+    let output = env.cmd().arg("list").assert().success();
+    let stdout = String::from_utf8_lossy(&output.get_output().stdout);
+    assert!(stdout
+        .lines()
+        .any(|l| l.contains("test-profile") && l.contains(" *")));
+
+    // 5. Delete the profile
     env.cmd()
         .args(["delete", "test-profile"])
         .assert()
         .success();
 
-    // 4. List again - should be empty
+    // 6. List again - should be empty
     env.cmd()
         .arg("list")
         .assert()
@@ -479,12 +564,19 @@ fn test_workflow_multiple_accounts() {
     env.create_claude_config(&side_account);
     env.cmd().args(["save", "side-project"]).assert().success();
 
-    // List all profiles
+    // Launch work profile
+    let _ = env.cmd().arg("work").assert();
+
+    // List all profiles - work should be marked current
     let output = env.cmd().arg("list").assert().success();
     let stdout = String::from_utf8_lossy(&output.get_output().stdout);
     assert!(stdout.contains("work"));
     assert!(stdout.contains("personal"));
     assert!(stdout.contains("side-project"));
+    // work should be marked with *
+    assert!(stdout
+        .lines()
+        .any(|l| l.contains("work") && l.contains(" *")));
 }
 
 #[test]

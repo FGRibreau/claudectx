@@ -7,9 +7,10 @@ use clap::{Parser, Subcommand};
 use dialoguer::Confirm;
 
 use config::{get_oauth_account, read_claude_config};
-use launcher::launch_claude;
+use launcher::switch_and_launch_claude;
 use profiles::{
-    delete_profile, get_profile_path, list_profiles, profile_exists, save_profile, slugify,
+    delete_profile, get_current_profile, get_profile_path, list_profiles, profile_exists,
+    save_profile, slugify,
 };
 use ui::select_profile;
 
@@ -68,7 +69,8 @@ fn main() {
                     std::process::exit(0);
                 }
 
-                select_profile(&profiles).expect("No profile selected")
+                let current_profile = get_current_profile();
+                select_profile(&profiles, current_profile.as_deref()).expect("No profile selected")
             });
 
             let path = get_profile_path(&profile_name);
@@ -92,8 +94,8 @@ fn main() {
                 }
             }
 
-            // Launch claude with the profile settings
-            launch_claude(&path, &args.claude_args);
+            // Switch symlink and launch claude
+            switch_and_launch_claude(&profile_name, &args.claude_args);
         }
         Some(Commands::List) => {
             let profiles = list_profiles();
@@ -103,6 +105,8 @@ fn main() {
                 return;
             }
 
+            let current_profile = get_current_profile();
+
             for name in profiles {
                 let path = get_profile_path(&name);
                 let config: serde_json::Value = serde_json::from_str(
@@ -111,9 +115,14 @@ fn main() {
                 .expect("Failed to parse profile");
 
                 let account = get_oauth_account(&config);
+                let marker = if current_profile.as_ref() == Some(&name) {
+                    " *"
+                } else {
+                    ""
+                };
                 println!(
-                    "{} - {} @ {}",
-                    name, account.display_name, account.organization_name
+                    "{} - {} @ {}{}",
+                    name, account.display_name, account.organization_name, marker
                 );
             }
         }

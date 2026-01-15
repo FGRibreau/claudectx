@@ -5,7 +5,7 @@ use crate::profiles::get_profile_path;
 
 /// Interactively select a profile from the list
 /// Returns the selected profile name, or None if cancelled
-pub fn select_profile(profiles: &[String]) -> Option<String> {
+pub fn select_profile(profiles: &[String], current_profile: Option<&str>) -> Option<String> {
     if profiles.is_empty() {
         println!("No profiles found. Use 'claudectx save <name>' to create one.");
         return None;
@@ -22,16 +22,26 @@ pub fn select_profile(profiles: &[String]) -> Option<String> {
             .expect("Failed to parse profile");
 
             let account = get_oauth_account(&config);
+            let marker = if current_profile == Some(name.as_str()) {
+                " *"
+            } else {
+                ""
+            };
             format!(
-                "{} - {} @ {}",
-                name, account.display_name, account.organization_name
+                "{} - {} @ {}{}",
+                name, account.display_name, account.organization_name, marker
             )
         })
         .collect();
 
+    // Find current selection index (default to first if not found)
+    let default_index = current_profile
+        .and_then(|current| profiles.iter().position(|name| name == current))
+        .unwrap_or(0);
+
     let selection = Select::new()
         .with_prompt("Select Claude profile")
-        .default(0)
+        .default(default_index)
         .items(&items)
         .interact_opt()
         .expect("Failed to display selection UI");

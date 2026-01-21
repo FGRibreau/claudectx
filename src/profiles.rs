@@ -3,6 +3,15 @@ use std::path::PathBuf;
 
 use crate::config::{claude_config_path, home_dir};
 
+/// Extract account UUID from a config JSON value
+fn get_account_uuid(config: &serde_json::Value) -> Option<String> {
+    config
+        .get("oauthAccount")?
+        .get("accountUuid")?
+        .as_str()
+        .map(String::from)
+}
+
 /// Get the profiles directory path (~/.claudectx/)
 pub fn profiles_dir() -> PathBuf {
     home_dir().join(".claudectx")
@@ -116,17 +125,43 @@ pub fn switch_to_profile(name: &str) {
     }
 }
 
-/// Get the current profile name if ~/.claude.json is a symlink to a profile
+/// Get the current profile name by checking:
+/// 1. If ~/.claude.json is a symlink to a profile (fast path)
+/// 2. If ~/.claude.json content matches a profile by accountUuid (fallback)
 pub fn get_current_profile() -> Option<String> {
     let config_path = claude_config_path();
 
-    if !config_path.is_symlink() {
+    // Fast path: check if it's a symlink to a profile
+    if config_path.is_symlink() {
+        let target = fs::read_link(&config_path).ok()?;
+        let target_name = target.file_name()?.to_string_lossy().to_string();
+        return target_name.strip_suffix(".claude.json").map(String::from);
+    }
+
+    // Fallback: compare accountUuid with saved profiles
+    if !config_path.exists() {
         return None;
     }
 
-    let target = fs::read_link(&config_path).ok()?;
-    let target_name = target.file_name()?.to_string_lossy().to_string();
-    target_name.strip_suffix(".claude.json").map(String::from)
+    let current_content = fs::read_to_string(&config_path).ok()?;
+    let current_config: serde_json::Value = serde_json::from_str(&current_content).ok()?;
+    let current_uuid = get_account_uuid(&current_config)?;
+
+    // Search through profiles for matching accountUuid
+    for profile_name in list_profiles() {
+        let profile_path = get_profile_path(&profile_name);
+        let profile_content = fs::read_to_string(&profile_path).ok();
+        let profile_config: Option<serde_json::Value> =
+            profile_content.and_then(|c| serde_json::from_str(&c).ok());
+
+        if let Some(profile_uuid) = profile_config.and_then(|c| get_account_uuid(&c)) {
+            if profile_uuid == current_uuid {
+                return Some(profile_name);
+            }
+        }
+    }
+
+    None
 }
 
 /// Get the backup path for claude.json

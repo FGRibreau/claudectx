@@ -798,3 +798,132 @@ fn test_backup_file_location() {
     assert!(backup_path.starts_with(env.home_path()));
     assert!(backup_path.ends_with(".claude.json.bak"));
 }
+
+// =============================================================================
+// CURRENT PROFILE DETECTION TESTS
+// =============================================================================
+
+#[test]
+fn test_list_marks_current_profile_when_config_matches_profile_content() {
+    let env = TestEnv::new();
+
+    // Create two profiles directly
+    let work_account = sample_account("work");
+    let personal_account = sample_account("personal");
+    env.create_profile("work", &work_account);
+    env.create_profile("personal", &personal_account);
+
+    // Set .claude.json to same content as "work" profile (NOT a symlink)
+    env.create_claude_config(&work_account);
+
+    // Verify it's not a symlink
+    assert!(
+        !env.claude_config_path().is_symlink(),
+        ".claude.json should be a regular file, not a symlink"
+    );
+
+    // List should show asterisk for "work" profile because content matches
+    let output = env.cmd().arg("list").assert().success();
+    let stdout = String::from_utf8_lossy(&output.get_output().stdout);
+
+    // The "work" profile should be marked with * because its content matches .claude.json
+    assert!(
+        stdout
+            .lines()
+            .any(|l| l.contains("work") && l.contains(" *")),
+        "Profile 'work' should be marked with asterisk when config content matches. Output:\n{}",
+        stdout
+    );
+
+    // The "personal" profile should NOT be marked
+    assert!(
+        stdout
+            .lines()
+            .any(|l| l.contains("personal") && !l.contains(" *")),
+        "Profile 'personal' should NOT be marked with asterisk. Output:\n{}",
+        stdout
+    );
+}
+
+#[test]
+fn test_list_no_asterisk_when_config_matches_no_profile() {
+    let env = TestEnv::new();
+
+    // Create two profiles
+    env.create_profile("work", &sample_account("work"));
+    env.create_profile("personal", &sample_account("personal"));
+
+    // Set .claude.json to different content (doesn't match any profile)
+    let different_account = sample_account("different");
+    env.create_claude_config(&different_account);
+
+    // List should show NO asterisk for any profile
+    let output = env.cmd().arg("list").assert().success();
+    let stdout = String::from_utf8_lossy(&output.get_output().stdout);
+
+    // No profile should be marked
+    assert!(
+        !stdout.contains(" *"),
+        "No profile should be marked when config doesn't match any profile. Output:\n{}",
+        stdout
+    );
+}
+
+#[test]
+fn test_list_asterisk_symlink_takes_precedence() {
+    let env = TestEnv::new();
+
+    // Create two profiles with same accountUuid to test precedence
+    let work_account = sample_account("work");
+    let personal_account = sample_account("personal");
+    env.create_profile("work", &work_account);
+    env.create_profile("personal", &personal_account);
+
+    // Create symlink to work profile
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(env.profile_path("work"), env.claude_config_path())
+        .expect("Failed to create symlink");
+    #[cfg(windows)]
+    std::os::windows::fs::symlink_file(env.profile_path("work"), env.claude_config_path())
+        .expect("Failed to create symlink");
+
+    // List should mark "work" because symlink points to it
+    let output = env.cmd().arg("list").assert().success();
+    let stdout = String::from_utf8_lossy(&output.get_output().stdout);
+
+    assert!(
+        stdout
+            .lines()
+            .any(|l| l.contains("work") && l.contains(" *")),
+        "Profile 'work' should be marked via symlink detection. Output:\n{}",
+        stdout
+    );
+}
+
+#[test]
+fn test_save_then_list_shows_asterisk_for_saved_profile() {
+    let env = TestEnv::new();
+
+    // Create a claude config and save it as "my-profile"
+    let account = sample_account("my-account");
+    env.create_claude_config(&account);
+    env.cmd().args(["save", "my-profile"]).assert().success();
+
+    // .claude.json is still a regular file (not symlink) but content matches
+    assert!(
+        !env.claude_config_path().is_symlink(),
+        ".claude.json should remain a regular file after save"
+    );
+
+    // List should show asterisk for "my-profile"
+    let output = env.cmd().arg("list").assert().success();
+    let stdout = String::from_utf8_lossy(&output.get_output().stdout);
+
+    assert!(
+        stdout
+            .lines()
+            .any(|l| l.contains("my-profile") && l.contains(" *")),
+        "Just-saved profile should be marked as current. Output:\n{}",
+        stdout
+    );
+}

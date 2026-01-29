@@ -3,6 +3,34 @@ use std::path::PathBuf;
 
 use crate::config::{claude_config_path, home_dir};
 
+/// Fields that are account-specific and should NOT be carried over when switching profiles.
+/// These belong to the target profile's identity and must be preserved.
+const ACCOUNT_SPECIFIC_FIELDS: &[&str] = &[
+    "oauthAccount",
+    "userID",
+    "groveConfigCache",
+    "cachedChromeExtensionInstalled",
+    "subscriptionNoticeCount",
+    "s1mAccessCache",
+    "recommendedSubscription",
+    "hasAvailableSubscription",
+];
+
+/// Merge portable (non-account-specific) settings from `current` into `target`.
+/// Account-specific fields in `target` are preserved; all other fields from `current` overwrite `target`.
+fn merge_portable_settings(current: &serde_json::Value, target: &mut serde_json::Value) {
+    let (Some(current_obj), Some(target_obj)) = (current.as_object(), target.as_object_mut())
+    else {
+        return;
+    };
+
+    for (key, value) in current_obj {
+        if !ACCOUNT_SPECIFIC_FIELDS.contains(&key.as_str()) {
+            target_obj.insert(key.clone(), value.clone());
+        }
+    }
+}
+
 /// Extract account UUID from a config JSON value
 fn get_account_uuid(config: &serde_json::Value) -> Option<String> {
     config
@@ -64,7 +92,8 @@ pub fn get_profile_path(name: &str) -> PathBuf {
     profiles_dir().join(format!("{}.claude.json", slug))
 }
 
-/// Save current ~/.claude.json as a profile
+/// Save current ~/.claude.json as a profile.
+/// If ~/.claude.json is not already a symlink, replaces it with a symlink to the saved profile.
 pub fn save_profile(name: &str) {
     let source = claude_config_path();
     if !source.exists() {
@@ -84,7 +113,18 @@ pub fn save_profile(name: &str) {
         )
     });
 
-    fs::write(&dest, content).expect("Failed to save profile");
+    fs::write(&dest, &content).expect("Failed to save profile");
+
+    // If source is not already a symlink, replace it with one pointing to the saved profile
+    if !source.is_symlink() {
+        fs::remove_file(&source).expect("Failed to remove original config");
+
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&dest, &source).expect("Failed to create symlink");
+
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_file(&dest, &source).expect("Failed to create symlink");
+    }
 }
 
 /// Delete a profile
@@ -98,7 +138,9 @@ pub fn profile_exists(name: &str) -> bool {
     get_profile_path(name).exists()
 }
 
-/// Switch to a profile by making ~/.claude.json a symlink to the profile
+/// Switch to a profile by making ~/.claude.json a symlink to the profile.
+/// Before switching, merges portable (non-account-specific) settings from the
+/// current config into the target profile so preferences carry over.
 pub fn switch_to_profile(name: &str) {
     let profile_path = get_profile_path(name);
     if !profile_path.exists() {
@@ -107,8 +149,26 @@ pub fn switch_to_profile(name: &str) {
 
     let config_path = claude_config_path();
 
-    // Remove existing file/symlink if it exists
+    // Merge portable settings from current config into target profile
     if config_path.exists() || config_path.is_symlink() {
+        let current_content = fs::read_to_string(&config_path).ok();
+        let current_config: Option<serde_json::Value> =
+            current_content.and_then(|c| serde_json::from_str(&c).ok());
+
+        if let Some(current) = current_config {
+            let target_content =
+                fs::read_to_string(&profile_path).expect("Failed to read target profile");
+            let mut target: serde_json::Value =
+                serde_json::from_str(&target_content).expect("Failed to parse target profile");
+
+            merge_portable_settings(&current, &mut target);
+
+            let merged =
+                serde_json::to_string_pretty(&target).expect("Failed to serialize merged config");
+            fs::write(&profile_path, merged).expect("Failed to write merged profile");
+        }
+
+        // Remove existing file/symlink
         fs::remove_file(&config_path).expect("Failed to remove existing config");
     }
 
@@ -243,5 +303,90 @@ mod tests {
         // Test that backup path is derived correctly
         let backup_path = super::claude_config_backup_path();
         assert!(backup_path.to_string_lossy().ends_with(".claude.json.bak"));
+    }
+
+    #[test]
+    fn test_merge_portable_settings_overwrites_portable_fields() {
+        let current = serde_json::json!({
+            "hasCompletedOnboarding": true,
+            "primaryApiKey": "sk-current",
+            "oauthAccount": {"accountUuid": "current-uuid"}
+        });
+        let mut target = serde_json::json!({
+            "hasCompletedOnboarding": false,
+            "primaryApiKey": "sk-target",
+            "oauthAccount": {"accountUuid": "target-uuid"}
+        });
+
+        merge_portable_settings(&current, &mut target);
+
+        // Portable fields overwritten by current
+        assert_eq!(target["hasCompletedOnboarding"], true);
+        assert_eq!(target["primaryApiKey"], "sk-current");
+        // Account-specific field preserved from target
+        assert_eq!(target["oauthAccount"]["accountUuid"], "target-uuid");
+    }
+
+    #[test]
+    fn test_merge_portable_settings_preserves_all_account_fields() {
+        let current = serde_json::json!({
+            "oauthAccount": "current",
+            "userID": "current",
+            "groveConfigCache": "current",
+            "cachedChromeExtensionInstalled": "current",
+            "subscriptionNoticeCount": "current",
+            "s1mAccessCache": "current",
+            "recommendedSubscription": "current",
+            "hasAvailableSubscription": "current",
+            "portable": "from-current"
+        });
+        let mut target = serde_json::json!({
+            "oauthAccount": "target",
+            "userID": "target",
+            "groveConfigCache": "target",
+            "cachedChromeExtensionInstalled": "target",
+            "subscriptionNoticeCount": "target",
+            "s1mAccessCache": "target",
+            "recommendedSubscription": "target",
+            "hasAvailableSubscription": "target",
+            "portable": "from-target"
+        });
+
+        merge_portable_settings(&current, &mut target);
+
+        for field in ACCOUNT_SPECIFIC_FIELDS {
+            assert_eq!(
+                target[field], "target",
+                "Field '{}' should be preserved from target",
+                field
+            );
+        }
+        assert_eq!(target["portable"], "from-current");
+    }
+
+    #[test]
+    fn test_merge_portable_settings_adds_new_fields() {
+        let current = serde_json::json!({
+            "newField": "added",
+            "oauthAccount": "current"
+        });
+        let mut target = serde_json::json!({
+            "oauthAccount": "target"
+        });
+
+        merge_portable_settings(&current, &mut target);
+
+        assert_eq!(target["newField"], "added");
+        assert_eq!(target["oauthAccount"], "target");
+    }
+
+    #[test]
+    fn test_merge_portable_settings_non_objects_are_noop() {
+        let current = serde_json::json!("not an object");
+        let mut target = serde_json::json!({"key": "value"});
+
+        merge_portable_settings(&current, &mut target);
+
+        assert_eq!(target["key"], "value");
     }
 }

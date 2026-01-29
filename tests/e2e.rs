@@ -46,8 +46,13 @@ impl TestEnv {
         self.claudectx_dir().join(format!("{}.claude.json", name))
     }
 
-    /// Create a valid .claude.json config file
+    /// Create a valid .claude.json config file (as a regular file, not a symlink)
     fn create_claude_config(&self, account: &serde_json::Value) {
+        let config_path = self.claude_config_path();
+        // Remove existing symlink first to avoid writing through it to the target
+        if config_path.is_symlink() {
+            fs::remove_file(&config_path).expect("Failed to remove existing symlink");
+        }
         let config = json!({
             "oauthAccount": account,
             "lastAccountUUID": account["accountUuid"],
@@ -55,7 +60,7 @@ impl TestEnv {
             "hasCompletedOnboarding": true
         });
         fs::write(
-            self.claude_config_path(),
+            &config_path,
             serde_json::to_string_pretty(&config).expect("serialize"),
         )
         .expect("Failed to write claude config");
@@ -909,10 +914,14 @@ fn test_save_then_list_shows_asterisk_for_saved_profile() {
     env.create_claude_config(&account);
     env.cmd().args(["save", "my-profile"]).assert().success();
 
-    // .claude.json is still a regular file (not symlink) but content matches
+    // .claude.json IS now a symlink after save (auto-symlink feature)
     assert!(
-        !env.claude_config_path().is_symlink(),
-        ".claude.json should remain a regular file after save"
+        env.claude_config_path().is_symlink(),
+        ".claude.json should be a symlink after save"
+    );
+    assert!(
+        env.is_symlink_to_profile("my-profile"),
+        ".claude.json should symlink to the saved profile"
     );
 
     // List should show asterisk for "my-profile"
@@ -926,4 +935,204 @@ fn test_save_then_list_shows_asterisk_for_saved_profile() {
         "Just-saved profile should be marked as current. Output:\n{}",
         stdout
     );
+}
+
+// =============================================================================
+// SAVE AUTO-SYMLINK TESTS
+// =============================================================================
+
+#[test]
+fn test_save_when_not_symlink_creates_symlink() {
+    let env = TestEnv::new();
+    let account = sample_account("auto-link");
+    env.create_claude_config(&account);
+
+    // .claude.json is a regular file
+    assert!(!env.claude_config_path().is_symlink());
+
+    env.cmd().args(["save", "auto-link"]).assert().success();
+
+    // After save, .claude.json should be a symlink to the profile
+    assert!(
+        env.claude_config_path().is_symlink(),
+        ".claude.json should be a symlink after save"
+    );
+    assert!(
+        env.is_symlink_to_profile("auto-link"),
+        ".claude.json should symlink to 'auto-link' profile"
+    );
+
+    // Profile file should exist and have the correct content
+    let profile = env.read_profile("auto-link");
+    assert_eq!(profile["oauthAccount"]["accountUuid"], "uuid-auto-link");
+}
+
+#[test]
+fn test_save_when_already_symlink_does_not_change_symlink_target() {
+    let env = TestEnv::new();
+
+    // Create first profile and symlink to it
+    let account1 = sample_account("first");
+    env.create_profile("first", &account1);
+
+    // Create symlink .claude.json -> first.claude.json
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(env.profile_path("first"), env.claude_config_path())
+        .expect("Failed to create symlink");
+    #[cfg(windows)]
+    std::os::windows::fs::symlink_file(env.profile_path("first"), env.claude_config_path())
+        .expect("Failed to create symlink");
+
+    assert!(env.is_symlink_to_profile("first"));
+
+    // Save as a different profile name — should NOT change symlink target
+    env.cmd().args(["save", "second"]).assert().success();
+
+    // Symlink should still point to "first" (not changed to "second")
+    assert!(
+        env.is_symlink_to_profile("first"),
+        "Symlink should still point to 'first' profile after saving as 'second'"
+    );
+
+    // But the "second" profile should exist with the same content
+    let profile = env.read_profile("second");
+    assert_eq!(profile["oauthAccount"]["accountUuid"], "uuid-first");
+}
+
+// =============================================================================
+// PORTABLE SETTINGS MERGE TESTS
+// =============================================================================
+
+#[test]
+fn test_switch_merges_portable_settings() {
+    let env = TestEnv::new();
+
+    // Create current config with portable settings (e.g. hasCompletedOnboarding, primaryApiKey)
+    // and account-specific fields
+    let current_config = json!({
+        "oauthAccount": sample_account("current"),
+        "userID": "current-user-id",
+        "hasCompletedOnboarding": true,
+        "primaryApiKey": "sk-current-key",
+        "customSetting": "my-custom-value",
+        "editorTheme": "dark"
+    });
+    fs::write(
+        env.claude_config_path(),
+        serde_json::to_string_pretty(&current_config).expect("serialize"),
+    )
+    .expect("write");
+
+    // Create target profile with different account and different portable settings
+    fs::create_dir_all(env.claudectx_dir()).expect("mkdir");
+    let target_config = json!({
+        "oauthAccount": sample_account("target"),
+        "userID": "target-user-id",
+        "hasCompletedOnboarding": false,
+        "primaryApiKey": "sk-target-key"
+    });
+    fs::write(
+        env.profile_path("target"),
+        serde_json::to_string_pretty(&target_config).expect("serialize"),
+    )
+    .expect("write");
+
+    // Switch to target profile
+    let _ = env.cmd().arg("target").assert();
+
+    // Read the target profile after merge
+    let merged = env.read_profile("target");
+
+    // Account-specific fields should come from the TARGET (preserved)
+    assert_eq!(merged["oauthAccount"]["accountUuid"], "uuid-target");
+    assert_eq!(merged["userID"], "target-user-id");
+
+    // Portable settings should come from the CURRENT (merged over)
+    assert_eq!(merged["hasCompletedOnboarding"], true);
+    assert_eq!(merged["primaryApiKey"], "sk-current-key");
+    assert_eq!(merged["customSetting"], "my-custom-value");
+    assert_eq!(merged["editorTheme"], "dark");
+}
+
+#[test]
+fn test_switch_preserves_account_specific_fields_from_target() {
+    let env = TestEnv::new();
+
+    // Current config with all account-specific fields
+    let current_config = json!({
+        "oauthAccount": sample_account("current"),
+        "userID": "current-user-id",
+        "groveConfigCache": {"current": true},
+        "cachedChromeExtensionInstalled": true,
+        "subscriptionNoticeCount": 5,
+        "s1mAccessCache": {"current": "data"},
+        "recommendedSubscription": "pro",
+        "hasAvailableSubscription": true,
+        "portableSetting": "from-current"
+    });
+    fs::write(
+        env.claude_config_path(),
+        serde_json::to_string_pretty(&current_config).expect("serialize"),
+    )
+    .expect("write");
+
+    // Target profile with its own account-specific fields
+    fs::create_dir_all(env.claudectx_dir()).expect("mkdir");
+    let target_config = json!({
+        "oauthAccount": sample_account("target"),
+        "userID": "target-user-id",
+        "groveConfigCache": {"target": true},
+        "cachedChromeExtensionInstalled": false,
+        "subscriptionNoticeCount": 0,
+        "s1mAccessCache": {"target": "data"},
+        "recommendedSubscription": "free",
+        "hasAvailableSubscription": false,
+        "portableSetting": "from-target"
+    });
+    fs::write(
+        env.profile_path("target"),
+        serde_json::to_string_pretty(&target_config).expect("serialize"),
+    )
+    .expect("write");
+
+    // Switch to target
+    let _ = env.cmd().arg("target").assert();
+
+    let merged = env.read_profile("target");
+
+    // ALL account-specific fields must come from the TARGET
+    assert_eq!(merged["oauthAccount"]["accountUuid"], "uuid-target");
+    assert_eq!(merged["userID"], "target-user-id");
+    assert_eq!(merged["groveConfigCache"]["target"], true);
+    assert_eq!(merged["cachedChromeExtensionInstalled"], false);
+    assert_eq!(merged["subscriptionNoticeCount"], 0);
+    assert_eq!(merged["s1mAccessCache"]["target"], "data");
+    assert_eq!(merged["recommendedSubscription"], "free");
+    assert_eq!(merged["hasAvailableSubscription"], false);
+
+    // Portable setting should come from CURRENT
+    assert_eq!(merged["portableSetting"], "from-current");
+}
+
+#[test]
+fn test_switch_when_no_current_config_exists() {
+    let env = TestEnv::new();
+
+    // No .claude.json exists at all
+    assert!(!env.claude_config_path().exists());
+
+    // Create target profile
+    env.create_profile("target", &sample_account("target"));
+
+    // Switch should work — no merge needed, just create symlink
+    let _ = env.cmd().arg("target").assert();
+
+    assert!(
+        env.is_symlink_to_profile("target"),
+        "Should create symlink even when no prior config exists"
+    );
+
+    // Profile content should be unchanged (no merge happened)
+    let profile = env.read_profile("target");
+    assert_eq!(profile["oauthAccount"]["accountUuid"], "uuid-target");
 }

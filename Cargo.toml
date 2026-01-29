@@ -1,6 +1,6 @@
 [package]
 name = "claudectx"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Francois-Guillaume RIBREAU <github@fgribreau.com>"]
 description = "Launch Claude Code with different profiles"
 repository = "https://github.com/FGRibreau/claudectx"

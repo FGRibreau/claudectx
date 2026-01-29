@@ -27,8 +27,8 @@
 
 ## How it works
 
-1. **Save**: `claudectx save work` copies `~/.claude.json` to `~/.claudectx/work.claude.json`
-2. **Launch**: `claudectx work` switches `~/.claude.json` symlink → profile, then launches `claude`
+1. **Save**: `claudectx save work` copies `~/.claude.json` to `~/.claudectx/work.claude.json` and symlinks `~/.claude.json` to it
+2. **Launch**: `claudectx work` updates the `~/.claude.json` symlink → profile, then launches `claude`
 
 The symlink ensures Claude reads the correct account configuration.
 

@@ -23,20 +23,21 @@
 
 ## What is this?
 
-**claudectx** manages multiple Claude Code profiles (Claude Max, Claude Team, personal) and launches Claude with the selected profile. Each profile is a complete `claude.json` config with its own account, MCP servers, and settings. Inspired by [kubectx](https://github.com/FGRibreau/kubectx-rs).
+**claudectx** manages multiple Claude Code accounts (Claude Max, Claude Team, personal) and launches Claude with the selected profile. Each profile stores only account-specific fields; your settings, MCP servers, and preferences stay in `~/.claude.json` untouched. Inspired by [kubectx](https://github.com/FGRibreau/kubectx-rs).
 
 ## How it works
 
-1. **Save**: `claudectx save work` copies `~/.claude.json` to `~/.claudectx/work.claude.json` and symlinks `~/.claude.json` to it
-2. **Launch**: `claudectx work` updates the `~/.claude.json` symlink → profile, then launches `claude`
+1. **Save**: `claudectx save work` extracts account fields from `~/.claude.json` into `~/.claudectx/work.claude.json`
+2. **Switch**: `claudectx work` patches `~/.claude.json` in-place with the profile's account fields, then launches `claude`
 
-The symlink ensures Claude reads the correct account configuration.
+Only account-specific fields (OAuth account, userID, subscription caches, etc.) are stored in profiles. Everything else in `~/.claude.json` (settings, MCP servers, API keys) is preserved across switches.
 
 ## Features
 
-- **Profile switching** - Symlink-based switching for proper account isolation
+- **In-place patching** - Switches accounts without losing settings or MCP config
 - **Direct launch** - Launches Claude automatically after switching
-- **Save profiles** - Store complete Claude configurations locally
+- **Slim profiles** - Store only account credentials, not entire configs
+- **Login workflow** - `claudectx login` to add new accounts interactively
 - **Quick switch** - Interactive selection with arrow keys
 - **Pass-through args** - Forward arguments to Claude: `claudectx work -- --dangerously-skip-permissions`
 - **Auto-slugify** - Profile names are normalized (`FG@Work` → `fg-work`)
@@ -193,8 +194,9 @@ sudo cp target/release/claudectx /usr/local/bin/
 | `claudectx <profile>` | Switch to profile and launch Claude |
 | `claudectx <profile> -- <args>` | Launch Claude with profile and extra arguments |
 | `claudectx list` | List all saved profiles (* marks current) |
-| `claudectx save <name>` | Save current config as profile |
+| `claudectx save <name>` | Save current account as profile |
 | `claudectx delete <name>` | Delete a profile |
+| `claudectx login` | Login to a new Claude account and save it as a profile |
 
 ### Examples
 
@@ -205,8 +207,11 @@ claudectx work
 # Launch with extra arguments
 claudectx work -- --dangerously-skip-permissions
 
-# Save current ~/.claude.json as "personal" profile
+# Save current account as "personal" profile
 claudectx save personal
+
+# Login to a new account and save it as a profile
+claudectx login
 
 # Interactive selection then launch
 claudectx
@@ -234,14 +239,15 @@ Profiles are stored as individual JSON files in `~/.claudectx/`:
 ```
 
 When you run `claudectx <profile>`:
-1. `~/.claude.json` becomes a symlink → `~/.claudectx/<profile>.claude.json`
-2. Claude is launched and reads from the symlinked config
+1. Account-specific fields in `~/.claude.json` are patched in-place from the profile
+2. Claude is launched and reads from the updated config
 
-Each profile is a complete copy of `~/.claude.json`, including:
-- OAuth account (email, organization)
-- MCP servers configuration
-- Claude Code settings
-- API keys
+Each profile is a **slim** JSON file containing only account-specific fields:
+- `oauthAccount` (email, organization, UUID)
+- `userID`
+- Subscription and cache fields (`groveConfigCache`, `s1mAccessCache`, etc.)
+
+Your portable settings (MCP servers, API keys, preferences) stay in `~/.claude.json` and are never overwritten.
 
 ### Profile Names
 

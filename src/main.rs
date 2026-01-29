@@ -11,8 +11,8 @@ use config::{get_oauth_account, read_claude_config};
 use launcher::switch_and_launch_claude;
 use login::run_login_workflow;
 use profiles::{
-    delete_profile, get_current_profile, get_profile_path, list_profiles, profile_exists,
-    save_profile, slugify,
+    delete_profile, get_current_profile, get_profile_path, list_profiles, migrate_if_needed,
+    profile_exists, save_profile, slugify,
 };
 use ui::select_profile;
 
@@ -52,6 +52,8 @@ enum Commands {
 }
 
 fn main() {
+    migrate_if_needed();
+
     let args = Args::parse();
 
     match args.command {
@@ -99,7 +101,7 @@ fn main() {
                 }
             }
 
-            // Switch symlink and launch claude
+            // Patch config and launch claude
             switch_and_launch_claude(&profile_name, &args.claude_args);
         }
         Some(Commands::List) => {

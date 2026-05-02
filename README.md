@@ -21,30 +21,6 @@
 
 ---
 
-## What is this?
-
-**claudectx** manages multiple Claude Code accounts (Claude Max, Claude Team, personal) and launches Claude with the selected profile. Each profile stores only account-specific fields; your settings, MCP servers, and preferences stay in `~/.claude.json` untouched. Inspired by [kubectx](https://github.com/FGRibreau/kubectx-rs).
-
-## How it works
-
-1. **Save**: `claudectx save work` extracts account fields from `~/.claude.json` into `~/.claudectx/work.claude.json`
-2. **Switch**: `claudectx work` patches `~/.claude.json` in-place with the profile's account fields, then launches `claude`
-
-Only account-specific fields (OAuth account, userID, subscription caches, etc.) are stored in profiles. Everything else in `~/.claude.json` (settings, MCP servers, API keys) is preserved across switches.
-
-## Features
-
-- **In-place patching** - Switches accounts without losing settings or MCP config
-- **Direct launch** - Launches Claude automatically after switching
-- **Slim profiles** - Store only account credentials, not entire configs
-- **Login workflow** - `claudectx login` to add new accounts interactively
-- **Quick switch** - Interactive selection with arrow keys
-- **Pass-through args** - Forward arguments to Claude: `claudectx work -- --dangerously-skip-permissions`
-- **Auto-slugify** - Profile names are normalized (`FG@Work` → `fg-work`)
-- **Zero config** - Works out of the box
-
----
-
 ## Sponsors
 
 <table>
@@ -72,8 +48,8 @@ Only account-specific fields (OAuth account, userID, subscription caches, etc.) 
     </td>
     <td align="center" width="175">
       <a href="https://netir.fr/?mtm_source=github&mtm_medium=sponsor&mtm_campaign=netir&mtm_content=claudectx">
-        <img src="assets/sponsors/netir.svg" height="60" alt="NetIR"/><br/>
-        <b>NetIR</b>
+        <img src="assets/sponsors/netir.svg" height="60" alt="Netir"/><br/>
+        <b>Netir</b>
       </a><br/>
       <sub>Find vetted French freelancers or get matched to dev gigs with mentorship.</sub>
     </td>
@@ -104,6 +80,30 @@ Only account-specific fields (OAuth account, userID, subscription caches, etc.) 
 </table>
 
 > **Interested in sponsoring?** [Get in touch](mailto:rust@fgribreau.com)
+
+---
+
+## What is this?
+
+**claudectx** manages multiple Claude Code accounts (Claude Max, Claude Team, personal) and launches Claude with the selected profile. Each profile stores only account-specific fields; your settings, MCP servers, and preferences stay in `~/.claude.json` untouched. Inspired by [kubectx](https://github.com/FGRibreau/kubectx-rs).
+
+## How it works
+
+1. **Save**: `claudectx save work` extracts account fields from `~/.claude.json` into `~/.claudectx/work.claude.json`
+2. **Switch**: `claudectx work` patches `~/.claude.json` in-place with the profile's account fields, then launches `claude`
+
+Only account-specific fields (OAuth account, userID, subscription caches, etc.) are stored in profiles. Everything else in `~/.claude.json` (settings, MCP servers, API keys) is preserved across switches.
+
+## Features
+
+- **In-place patching** - Switches accounts without losing settings or MCP config
+- **Direct launch** - Launches Claude automatically after switching
+- **Slim profiles** - Store only account credentials, not entire configs
+- **Login workflow** - `claudectx login` to add new accounts interactively
+- **Quick switch** - Interactive selection with arrow keys
+- **Pass-through args** - Forward arguments to Claude: `claudectx work -- --dangerously-skip-permissions`
+- **Auto-slugify** - Profile names are normalized (`FG@Work` → `fg-work`)
+- **Zero config** - Works out of the box
 
 ---
 

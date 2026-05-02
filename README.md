@@ -49,38 +49,61 @@ Only account-specific fields (OAuth account, userID, subscription caches, etc.) 
 
 <table>
   <tr>
-    <td align="center" width="200">
-        <a href="https://getnatalia.com/">
-        <img src="assets/sponsors/natalia.svg" height="60" alt="Natalia"/><br/>
-        <b>Natalia</b>
-        </a><br/>
-        <sub>24/7 AI voice and whatsapp agent for customer services</sub>
-    </td>
-    <td align="center" width="200">
-      <a href="https://nobullshitconseil.com/">
-        <img src="assets/sponsors/nobullshitconseil.svg" height="60" alt="NoBullshitConseil"/><br/>
-        <b>NoBullshitConseil</b>
+    <td align="center" width="175">
+      <a href="https://france-nuage.fr/?mtm_source=github&mtm_medium=sponsor&mtm_campaign=france-nuage&mtm_content=claudectx">
+        <img src="assets/sponsors/france-nuage.svg" height="60" alt="France-Nuage"/><br/>
+        <b>France-Nuage</b>
       </a><br/>
-      <sub>360° tech consulting</sub>
+      <sub>Sovereign EU cloud for your side-projects. Re-internalise when you want.</sub>
     </td>
-    <td align="center" width="200">
-      <a href="https://www.hook0.com/">
+    <td align="center" width="175">
+      <a href="https://www.hook0.com/?mtm_source=github&mtm_medium=sponsor&mtm_campaign=hook0&mtm_content=claudectx">
         <img src="assets/sponsors/hook0.png" height="60" alt="Hook0"/><br/>
         <b>Hook0</b>
       </a><br/>
-      <sub>Open-Source Webhooks-as-a-Service</sub>
+      <sub>Self-hosted Webhooks-as-a-Service. Skip the queue &amp; retry plumbing.</sub>
     </td>
-    <td align="center" width="200">
-      <a href="https://france-nuage.fr/">
-        <img src="assets/sponsors/france-nuage.png" height="60" alt="France-Nuage"/><br/>
-        <b>France-Nuage</b>
+    <td align="center" width="175">
+      <a href="https://getnatalia.com/?mtm_source=github&mtm_medium=sponsor&mtm_campaign=natalia&mtm_content=claudectx">
+        <img src="assets/sponsors/natalia.svg" height="60" alt="Natalia"/><br/>
+        <b>Natalia</b>
       </a><br/>
-      <sub>Sovereign cloud hosting in France</sub>
+      <sub>Coding all day? Natalia answers your prospects' calls 24/7 in your voice.</sub>
+    </td>
+    <td align="center" width="175">
+      <a href="https://netir.fr/?mtm_source=github&mtm_medium=sponsor&mtm_campaign=netir&mtm_content=claudectx">
+        <img src="assets/sponsors/netir.svg" height="60" alt="NetIR"/><br/>
+        <b>NetIR</b>
+      </a><br/>
+      <sub>Find vetted French freelancers or get matched to dev gigs with mentorship.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="233">
+      <a href="https://nobullshitconseil.com/?mtm_source=github&mtm_medium=sponsor&mtm_campaign=nbc&mtm_content=claudectx">
+        <img src="assets/sponsors/nobullshitconseil.svg" height="60" alt="NoBullshitConseil"/><br/>
+        <b>NoBullshitConseil</b>
+      </a><br/>
+      <sub>Tech advisory without the bullshit. Straight answers for founders &amp; CTOs.</sub>
+    </td>
+    <td align="center" width="233">
+      <a href="https://qualneo.fr/?mtm_source=github&mtm_medium=sponsor&mtm_campaign=qualneo&mtm_content=claudectx">
+        <img src="assets/sponsors/qualneo.svg" height="60" alt="Qualneo"/><br/>
+        <b>Qualneo</b>
+      </a><br/>
+      <sub>French Qualiopi LMS — 32 indicators wired, audit-ready out of the box.</sub>
+    </td>
+    <td align="center" width="233">
+      <a href="https://recapro.ai/?mtm_source=github&mtm_medium=sponsor&mtm_campaign=recapro&mtm_content=claudectx">
+        <img src="assets/sponsors/recapro.png" height="60" alt="Recapro"/><br/>
+        <b>Recapro</b>
+      </a><br/>
+      <sub>Sovereign AI meeting notes. Transcribe &amp; summarise without sending data out.</sub>
     </td>
   </tr>
 </table>
 
-> **Interested in sponsoring?** [Get in touch](mailto:sponsoring@fgribreau.com)
+> **Interested in sponsoring?** [Get in touch](mailto:rust@fgribreau.com)
 
 ---
 
